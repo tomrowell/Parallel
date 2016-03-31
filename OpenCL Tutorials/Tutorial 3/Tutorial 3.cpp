@@ -63,7 +63,72 @@ int main(int argc, char **argv) {
 			throw err;
 		}
 
-		typedef int mytype;
+		typedef string myType;
+		typedef float floatType;
+		string loc, yy, mm, dd, tm, tp;
+		std::vector<myType> entryLoc;
+		std::vector<myType> entryYear;
+		std::vector<myType> entryMonth;
+		std::vector<myType> entryDay;
+		std::vector<myType> entryTime;
+		std::vector<floatType> entryTemp;
+
+		int entryLength = 0;
+		try {
+			ifstream fileLoc("C:\\Users\\Computing\\Documents\\GitHub\\Parallel\\OpenCL Tutorials\\x64\\Debug\\Files\\temp_lincolnshire_short.txt");
+			string fileLine;
+			while (fileLoc >> loc >> yy >> mm >> dd >> tm >> tp) {
+				entryLoc.push_back(loc);
+				entryYear.push_back(yy);
+				entryMonth.push_back(mm);
+				entryDay.push_back(dd);
+				entryTime.push_back(tm);
+				entryTemp.push_back(stof(tp));
+
+				entryLength++;
+				if (entryLength % 1000 == 0) {
+					std::cout << entryLength << endl;
+				}
+			}
+		}
+		catch (const cl::Error& err) {
+			std::cout << "File input error";
+		}
+
+		size_t entryElements = entryTemp.size(); 
+		size_t entryInputSize = entryTemp.size()*sizeof(floatType);//size in bytes
+		//size_t entryGroups = entryElements / entryLocalSize;
+
+		size_t entryMaxSize;
+
+		for (int i = 1; i <= 1024; i++)
+		{
+			std::cout << i;
+			if (entryLength % i == 0)
+				entryMaxSize = i;
+		}
+
+		std::vector<floatType> outTemp(entryElements);
+		size_t entryOutputSize = outTemp.size()*sizeof(floatType);//size in bytes
+
+		cl::Buffer bufferTempIn(context, CL_MEM_READ_ONLY, entryInputSize);
+		cl::Buffer bufferTempOut(context, CL_MEM_READ_WRITE, entryOutputSize);
+
+		queue.enqueueWriteBuffer(bufferTempIn, CL_TRUE, 0, entryInputSize, &entryTemp[0]);
+		queue.enqueueFillBuffer(bufferTempOut, 0, 0, entryOutputSize);//zero B buffer on device memory
+
+		cl::Kernel kernel_1 = cl::Kernel(program, "reduce_add_1");
+		kernel_1.setArg(0, bufferTempIn);
+		kernel_1.setArg(1, bufferTempOut);
+		//kernel_1.setArg(2, cl::Local(local_size*sizeof(mytype)));//local memory size
+
+		queue.enqueueNDRangeKernel(kernel_1, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryMaxSize));//call all kernels in a sequence
+		queue.enqueueReadBuffer(bufferTempOut, CL_TRUE, 0, entryOutputSize, &outTemp[0]);//Copy the result from device to host
+
+		std::cout << "A = " << entryTemp << std::endl;
+		std::cout << "B = " << outTemp << std::endl;
+
+		/*typedef int mytype;
 
 		//Part 4 - memory allocation
 		//host - input
@@ -116,7 +181,7 @@ int main(int argc, char **argv) {
 		queue.enqueueReadBuffer(buffer_B, CL_TRUE, 0, output_size, &B[0]);
 
 		std::cout << "A = " << A << std::endl;
-		std::cout << "B = " << B << std::endl;
+		std::cout << "B = " << B << std::endl;*/
 	}
 	catch (cl::Error err) {
 		std::cerr << "ERROR: " << err.what() << ", " << getErrorString(err.err()) << std::endl;
