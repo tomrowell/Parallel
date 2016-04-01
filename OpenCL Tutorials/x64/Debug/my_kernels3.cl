@@ -1,28 +1,82 @@
-﻿//
-__kernel void value_min(__global const float* A, __global float* B, __local float* scratch) {
+﻿//minimum value reduce
+__kernel void value_min(__global const float* A, __global float* B, __local float* min) {
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
 	int N = get_local_size(0);
-	int lowestVal = -50;
 
-	scratch[lid] = A[id];
+	min[lid] = A[id];
 
 	barrier(CLK_LOCAL_MEM_FENCE); //wait for all threads to finish copying
 	
 	//cycles through each work group and places the lowest value at the front of the group
 	for (int i = 1; i < N; i *= 2) {
+		//calculates the minimum value of each work group
 		if (!(lid % (i * 2)) && ((lid + i) < N)) 
-			if (scratch[lid] > scratch[lid + i]){
-				scratch[lid] = scratch[lid + i];
+			if (min[lid] > min[lid + i]){
+				min[lid] = min[lid + i];
 			}
-
+			
 		barrier(CLK_LOCAL_MEM_FENCE);
 	}
 
 	//Places the lowest values from each work group into an array
 	if (lid == 0)
-		if (B[(id/N)+1] > scratch[lid])
-			B[(id/N)+1] = scratch[lid];
+		B[(id/N)+1] = min[lid];
+			
+		barrier(CLK_LOCAL_MEM_FENCE);
+}
+
+//maximum value reduce
+__kernel void value_max(__global const float* A, __global float* B, __local float* max) {
+	int id = get_global_id(0);
+	int lid = get_local_id(0);
+	int N = get_local_size(0);
+
+	max[lid] = A[id];
+
+	barrier(CLK_LOCAL_MEM_FENCE); //wait for all threads to finish copying
+	
+	//cycles through each work group and places the highest value at the front of the group
+	for (int i = 1; i < N; i *= 2) {
+		//calculates the maximum value of each work group
+		if (!(lid % (i * 2)) && ((lid + i) < N)) 
+			if (max[lid] < max[lid + i]){
+				max[lid] = max[lid + i];
+			}
+			
+		barrier(CLK_LOCAL_MEM_FENCE);
+	}
+
+	//Places the lowest values from each work group into an array
+	if (lid == 0)
+		B[(id/N)+1] = max[lid];
+			
+		barrier(CLK_LOCAL_MEM_FENCE);
+}
+
+//additive value reduce for average
+__kernel void value_avg(__global const float* A, __global float* B, __local float* avg) {
+	int id = get_global_id(0);
+	int lid = get_local_id(0);
+	int N = get_local_size(0);
+
+	avg[lid] = A[id];
+
+	barrier(CLK_LOCAL_MEM_FENCE); //wait for all threads to finish copying
+	
+	//cycles through each work group, adding all of the values together and places the total value at the front of the group
+	for (int i = 1; i < N; i *= 2) {
+		if (!(lid % (i * 2)) && ((lid + i) < N)) 
+			avg[lid] += avg[lid + i];
+			
+		barrier(CLK_LOCAL_MEM_FENCE);
+	}
+
+	//Places the lowest values from each work group into an array
+	if (lid == 0)
+		B[(id/N)+1] = avg[lid];
+			
+		barrier(CLK_LOCAL_MEM_FENCE);
 }
 
 //fixed 4 step reduce

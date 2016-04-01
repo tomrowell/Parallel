@@ -1,5 +1,5 @@
 ﻿  Tutorial 3.cpp
-Tutorial 3.cpp(94): warning C4101: 'err': unreferenced local variable
+Tutorial 3.cpp(111): warning C4101: 'err': unreferenced local variable
   Tutorial 3.vcxproj -> C:\Users\Computing\Documents\GitHub\Parallel\OpenCL Tutorials\x64\Debug\Tutorial 3.exe
   my_kernels3.cl
           1 file(s) copied.

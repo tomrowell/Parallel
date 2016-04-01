@@ -73,10 +73,26 @@ int main(int argc, char **argv) {
 		std::vector<myType> entryTime;
 		std::vector<floatType> entryTemp;
 
+		string filePath = "C:\\Users\\Computing\\Documents\\GitHub\\Parallel\\OpenCL Tutorials\\x64\\Debug\\Files\\temp_lincolnshire_short.txt";
 		int entryLength = 0;
 		try {
-			ifstream fileLoc("C:\\Users\\Computing\\Documents\\GitHub\\Parallel\\OpenCL Tutorials\\x64\\Debug\\Files\\temp_lincolnshire_short.txt");
+			ifstream fileLoc(filePath);
+			ifstream fileLoc2(filePath);
 			string fileLine;
+			int fileCount = 0;
+			std::cout << "Loading file." << endl;
+			while (std::getline(fileLoc2, fileLine)) {
+				fileCount++;
+				if (!(fileCount % 40000)) {
+					std::cout << "\r" << "   " << flush;
+					std::cout << "\r" << flush;
+				}
+				else
+					if (!(fileCount % 10000))
+						std::cout << ".";
+			}
+			std::cout << endl;
+			std::cout << "Processing data." << endl;
 			while (fileLoc >> loc >> yy >> mm >> dd >> tm >> tp) {
 				entryLoc.push_back(loc);
 				entryYear.push_back(yy);
@@ -86,10 +102,11 @@ int main(int argc, char **argv) {
 				entryTemp.push_back(stof(tp));
 
 				entryLength++;
-				if (entryLength % 1000 == 0) {
-					std::cout << entryLength << endl;
+				if (entryLength % (fileCount / 100) == 0) {
+					std::cout << "\r" << (entryLength / (fileCount / 100)) << "%" << flush;
 				}
 			}
+			std::cout << endl;
 		}
 		catch (const cl::Error& err) {
 			std::cout << "File input error";
@@ -111,30 +128,65 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		std::vector<floatType> outTempMin(entryGroups+1); //creates the output vector that will have 1 more slot that there are work groups
+		//creates the output vectors with a size 1 higher than there are work groups
+		std::vector<floatType> outTempMin(entryGroups + 1);
+		std::vector<floatType> outTempMax(entryGroups + 1);
+		std::vector<floatType> outTempAvg(entryGroups + 1);
 		size_t entryOutputSize = outTempMin.size()*sizeof(floatType);
 
 		//creates buffers for input & output vectors
 		cl::Buffer bufferInTemp(context, CL_MEM_READ_ONLY, entryInputSize);
-		cl::Buffer bufferOutTemp(context, CL_MEM_READ_WRITE, entryOutputSize);
+		cl::Buffer bufferOutTempMin(context, CL_MEM_READ_WRITE, entryOutputSize);
+		cl::Buffer bufferOutTempMax(context, CL_MEM_READ_WRITE, entryOutputSize);
+		cl::Buffer bufferOutTempAvg(context, CL_MEM_READ_WRITE, entryOutputSize);
 
 		queue.enqueueWriteBuffer(bufferInTemp, CL_TRUE, 0, entryInputSize, &entryTemp[0]);
-		queue.enqueueFillBuffer(bufferOutTemp, 0, 0, entryOutputSize);
+		queue.enqueueFillBuffer(bufferOutTempMin, 0, 0, entryOutputSize);
+		queue.enqueueFillBuffer(bufferOutTempMax, 0, 0, entryOutputSize);
+		queue.enqueueFillBuffer(bufferOutTempAvg, 0, 0, entryOutputSize);
 
 		cl::Kernel kernel_1 = cl::Kernel(program, "value_min");
 		kernel_1.setArg(0, bufferInTemp);
-		kernel_1.setArg(1, bufferOutTemp);
-		kernel_1.setArg(2, cl::Local(entryGroupSize*sizeof(myType)));//local memory size
-
+		kernel_1.setArg(1, bufferOutTempMin);
+		kernel_1.setArg(2, cl::Local(entryGroupSize*sizeof(myType)));
+		
 		queue.enqueueNDRangeKernel(kernel_1, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));//call all kernels in a sequence
-		queue.enqueueReadBuffer(bufferOutTemp, CL_TRUE, 0, entryOutputSize, &outTempMin[0]);//Copy the result from device to host
+		queue.enqueueReadBuffer(bufferOutTempMin, CL_TRUE, 0, entryOutputSize, &outTempMin[0]);//Copy the results from device to host
 
+		cl::Kernel kernel_2 = cl::Kernel(program, "value_max");
+		kernel_2.setArg(0, bufferInTemp);
+		kernel_2.setArg(1, bufferOutTempMax);
+		kernel_2.setArg(2, cl::Local(entryGroupSize*sizeof(myType)));
+
+		queue.enqueueNDRangeKernel(kernel_2, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));
+		queue.enqueueReadBuffer(bufferOutTempMax, CL_TRUE, 0, entryOutputSize, &outTempMax[0]);
+
+		cl::Kernel kernel_3 = cl::Kernel(program, "value_avg");
+		kernel_3.setArg(0, bufferInTemp);
+		kernel_3.setArg(1, bufferOutTempAvg);
+		kernel_3.setArg(2, cl::Local(entryGroupSize*sizeof(myType)));
+
+		queue.enqueueNDRangeKernel(kernel_3, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));
+		queue.enqueueReadBuffer(bufferOutTempAvg, CL_TRUE, 0, entryOutputSize, &outTempAvg[0]);
+
+		outTempMin[0] = 999;
+		outTempMax[0] = -999;
 		for (int i = 1; i <= entryGroups; i++) {
 			if (outTempMin[0] > outTempMin[i])
 				outTempMin[0] = outTempMin[i];
+
+			if (outTempMax[0] < outTempMax[i])
+				outTempMax[0] = outTempMax[i];
+
+			outTempAvg[0] += outTempAvg[i];
 		}
 
+		outTempAvg[0] /= entryElements;
+
+		std::cout << std::endl;
 		std::cout << "Min = " << outTempMin[0] << std::endl;
+		std::cout << "Max = " << outTempMax[0] << std::endl;
+		std::cout << "Avg = " << outTempAvg[0] << std::endl;
 
 		/*typedef int mytype;
 
