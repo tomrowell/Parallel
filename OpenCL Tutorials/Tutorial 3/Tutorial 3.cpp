@@ -99,16 +99,20 @@ int main(int argc, char **argv) {
 		size_t entryInputSize = entryTemp.size()*sizeof(floatType);//size in bytes
 		//size_t entryGroups = entryElements / entryLocalSize;
 
-		size_t entryMaxSize;
+		size_t entryGroupSize;
+		size_t entryGroups;
 
-		for (int i = 1; i <= 1024; i++)
+		//finds the maximum amount of threads that can be used for the given set of data
+		for (int i = 1024; i >= 1; i--)
 		{
-			std::cout << i;
-			if (entryLength % i == 0)
-				entryMaxSize = i;
+			if (entryLength % i == 0) {
+				entryGroupSize = i;
+				entryGroups = entryLength / entryGroupSize;
+				break;
+			}
 		}
 
-		std::vector<floatType> outTemp(entryElements);
+		std::vector<floatType> outTemp(entryGroupSize);
 		size_t entryOutputSize = outTemp.size()*sizeof(floatType);//size in bytes
 
 		cl::Buffer bufferTempIn(context, CL_MEM_READ_ONLY, entryInputSize);
@@ -117,15 +121,22 @@ int main(int argc, char **argv) {
 		queue.enqueueWriteBuffer(bufferTempIn, CL_TRUE, 0, entryInputSize, &entryTemp[0]);
 		queue.enqueueFillBuffer(bufferTempOut, 0, 0, entryOutputSize);//zero B buffer on device memory
 
-		cl::Kernel kernel_1 = cl::Kernel(program, "reduce_add_1");
+		cl::Kernel kernel_1 = cl::Kernel(program, "value_min");
 		kernel_1.setArg(0, bufferTempIn);
 		kernel_1.setArg(1, bufferTempOut);
-		//kernel_1.setArg(2, cl::Local(local_size*sizeof(mytype)));//local memory size
+		kernel_1.setArg(2, cl::Local(entryGroupSize*sizeof(myType)));//local memory size
 
-		queue.enqueueNDRangeKernel(kernel_1, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryMaxSize));//call all kernels in a sequence
+		queue.enqueueNDRangeKernel(kernel_1, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));//call kernels for the first work group in a sequence
+
+		/*if (entryGroups > 1) {
+			for (int i = 1; i < entryGroups; i++) {
+				queue.enqueueNDRangeKernel(kernel_1, cl::NDRange(i*entryGroupSize), cl::NDRange(entryElements), cl::NDRange(entryGroupSize));
+			}
+		}*/
+
 		queue.enqueueReadBuffer(bufferTempOut, CL_TRUE, 0, entryOutputSize, &outTemp[0]);//Copy the result from device to host
 
-		std::cout << "A = " << entryTemp << std::endl;
+		//std::cout << "A = " << entryTemp << std::endl;
 		std::cout << "B = " << outTemp << std::endl;
 
 		/*typedef int mytype;

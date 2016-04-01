@@ -1,4 +1,35 @@
-﻿//fixed 4 step reduce
+﻿//
+__kernel void value_min(__global const float* A, __global float* B, __local float* scratch) {
+	int id = get_global_id(0);
+	int lid = get_local_id(0);
+	int N = get_local_size(0);
+	int lowestVal = -50;
+
+	scratch[lid] = A[id];
+
+	barrier(CLK_LOCAL_MEM_FENCE); //wait for all threads to finish copying
+	
+	//cycles through each work group and places the lowest value at the front of the group
+	for (int i = 1; i < N; i *= 2) {
+		if (!(lid % (i * 2)) && ((lid + i) < N)) 
+			if(scratch[lid] > scratch[lid + i]){
+				scratch[lid] = scratch[lid + i];
+			}
+
+		barrier(CLK_LOCAL_MEM_FENCE);
+	}
+	barrier(CLK_GLOBAL_MEM_FENCE);
+
+	//copy the cache to output array
+	//B[id] = scratch[lid];
+
+	//calculates if the lowest value of the current workgroup is lower than the first value
+	if(!lid && id)
+		if(B[0] > scratch[lid])
+			B[0] = scratch[lid];
+}
+
+//fixed 4 step reduce
 __kernel void reduce_add_1(__global const int* A, __global int* B) {
 	int id = get_global_id(0);
 	int N = get_global_size(0);
