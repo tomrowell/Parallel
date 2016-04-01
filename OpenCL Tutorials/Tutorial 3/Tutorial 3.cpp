@@ -96,8 +96,7 @@ int main(int argc, char **argv) {
 		}
 
 		size_t entryElements = entryTemp.size(); 
-		size_t entryInputSize = entryTemp.size()*sizeof(floatType);//size in bytes
-		//size_t entryGroups = entryElements / entryLocalSize;
+		size_t entryInputSize = entryTemp.size()*sizeof(floatType);//size in bytes, used for buffer
 
 		size_t entryGroupSize;
 		size_t entryGroups;
@@ -107,37 +106,35 @@ int main(int argc, char **argv) {
 		{
 			if (entryLength % i == 0) {
 				entryGroupSize = i;
-				entryGroups = entryLength / entryGroupSize;
+				entryGroups = entryLength / entryGroupSize; //uses the amount of threads to determint he amount of work groups
 				break;
 			}
 		}
 
-		std::vector<floatType> outTemp(entryGroupSize);
-		size_t entryOutputSize = outTemp.size()*sizeof(floatType);//size in bytes
+		std::vector<floatType> outTempMin(entryGroups+1); //creates the output vector that will have 1 more slot that there are work groups
+		size_t entryOutputSize = outTempMin.size()*sizeof(floatType);
 
-		cl::Buffer bufferTempIn(context, CL_MEM_READ_ONLY, entryInputSize);
-		cl::Buffer bufferTempOut(context, CL_MEM_READ_WRITE, entryOutputSize);
+		//creates buffers for input & output vectors
+		cl::Buffer bufferInTemp(context, CL_MEM_READ_ONLY, entryInputSize);
+		cl::Buffer bufferOutTemp(context, CL_MEM_READ_WRITE, entryOutputSize);
 
-		queue.enqueueWriteBuffer(bufferTempIn, CL_TRUE, 0, entryInputSize, &entryTemp[0]);
-		queue.enqueueFillBuffer(bufferTempOut, 0, 0, entryOutputSize);//zero B buffer on device memory
+		queue.enqueueWriteBuffer(bufferInTemp, CL_TRUE, 0, entryInputSize, &entryTemp[0]);
+		queue.enqueueFillBuffer(bufferOutTemp, 0, 0, entryOutputSize);
 
 		cl::Kernel kernel_1 = cl::Kernel(program, "value_min");
-		kernel_1.setArg(0, bufferTempIn);
-		kernel_1.setArg(1, bufferTempOut);
+		kernel_1.setArg(0, bufferInTemp);
+		kernel_1.setArg(1, bufferOutTemp);
 		kernel_1.setArg(2, cl::Local(entryGroupSize*sizeof(myType)));//local memory size
 
-		queue.enqueueNDRangeKernel(kernel_1, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));//call kernels for the first work group in a sequence
+		queue.enqueueNDRangeKernel(kernel_1, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));//call all kernels in a sequence
+		queue.enqueueReadBuffer(bufferOutTemp, CL_TRUE, 0, entryOutputSize, &outTempMin[0]);//Copy the result from device to host
 
-		/*if (entryGroups > 1) {
-			for (int i = 1; i < entryGroups; i++) {
-				queue.enqueueNDRangeKernel(kernel_1, cl::NDRange(i*entryGroupSize), cl::NDRange(entryElements), cl::NDRange(entryGroupSize));
-			}
-		}*/
+		for (int i = 1; i <= entryGroups; i++) {
+			if (outTempMin[0] > outTempMin[i])
+				outTempMin[0] = outTempMin[i];
+		}
 
-		queue.enqueueReadBuffer(bufferTempOut, CL_TRUE, 0, entryOutputSize, &outTemp[0]);//Copy the result from device to host
-
-		//std::cout << "A = " << entryTemp << std::endl;
-		std::cout << "B = " << outTemp << std::endl;
+		std::cout << "Min = " << outTempMin[0] << std::endl;
 
 		/*typedef int mytype;
 

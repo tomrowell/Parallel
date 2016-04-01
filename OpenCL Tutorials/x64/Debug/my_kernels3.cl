@@ -12,21 +12,17 @@ __kernel void value_min(__global const float* A, __global float* B, __local floa
 	//cycles through each work group and places the lowest value at the front of the group
 	for (int i = 1; i < N; i *= 2) {
 		if (!(lid % (i * 2)) && ((lid + i) < N)) 
-			if(scratch[lid] > scratch[lid + i]){
+			if (scratch[lid] > scratch[lid + i]){
 				scratch[lid] = scratch[lid + i];
 			}
 
 		barrier(CLK_LOCAL_MEM_FENCE);
 	}
-	barrier(CLK_GLOBAL_MEM_FENCE);
 
-	//copy the cache to output array
-	//B[id] = scratch[lid];
-
-	//calculates if the lowest value of the current workgroup is lower than the first value
-	if(!lid && id)
-		if(B[0] > scratch[lid])
-			B[0] = scratch[lid];
+	//Places the lowest values from each work group into an array
+	if (lid == 0)
+		if (B[(id/N)+1] > scratch[lid])
+			B[(id/N)+1] = scratch[lid];
 }
 
 //fixed 4 step reduce
