@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
 	int platform_id = 0;
 	int device_id = 0;
 
-	for (int i = 1; i < argc; i++)	{
+	for (int i = 1; i < argc; i++) {
 		if ((strcmp(argv[i], "-p") == 0) && (i < (argc - 1))) { platform_id = atoi(argv[++i]); }
 		else if ((strcmp(argv[i], "-d") == 0) && (i < (argc - 1))) { device_id = atoi(argv[++i]); }
 		else if (strcmp(argv[i], "-l") == 0) { std::cout << ListPlatformsDevices() << std::endl; }
@@ -64,56 +64,43 @@ int main(int argc, char **argv) {
 		}
 
 		typedef string myType;
+		typedef int intType;
 		typedef float floatType;
 		string loc, yy, mm, dd, tm, tp;
-		std::vector<myType> entryLoc;
+		/*std::vector<myType> entryLoc;
 		std::vector<myType> entryYear;
 		std::vector<myType> entryMonth;
 		std::vector<myType> entryDay;
-		std::vector<myType> entryTime;
-		std::vector<floatType> entryTemp;
+		std::vector<myType> entryTime;*/
+		std::vector<intType> entryTemp;
 
 		string filePath = "C:\\Users\\Computing\\Documents\\GitHub\\Parallel\\OpenCL Tutorials\\x64\\Debug\\Files\\temp_lincolnshire_short.txt";
 		int entryLength = 0;
 		try {
 			ifstream fileLoc(filePath);
-			ifstream fileLoc2(filePath);
 			string fileLine;
-			int fileCount = 0;
-			std::cout << "Loading file." << endl;
-			while (std::getline(fileLoc2, fileLine)) {
-				fileCount++;
-				if (!(fileCount % 40000)) {
-					std::cout << "\r" << "   " << flush;
-					std::cout << "\r" << flush;
-				}
-				else
-					if (!(fileCount % 10000))
-						std::cout << ".";
-			}
-			std::cout << endl;
-			std::cout << "Processing data." << endl;
 			while (fileLoc >> loc >> yy >> mm >> dd >> tm >> tp) {
-				entryLoc.push_back(loc);
+				/*entryLoc.push_back(loc);
 				entryYear.push_back(yy);
 				entryMonth.push_back(mm);
 				entryDay.push_back(dd);
-				entryTime.push_back(tm);
-				entryTemp.push_back(stof(tp));
+				entryTime.push_back(tm);*/
+				entryTemp.push_back((stof(tp)) * 10);
 
 				entryLength++;
-				if (entryLength % (fileCount / 100) == 0) {
-					std::cout << "\r" << (entryLength / (fileCount / 100)) << "%" << flush;
+				if (entryLength % 1000 == 0) {
+					std::cout << "\rLine Count:" << (entryLength) << flush;
 				}
 			}
+			std::cout << "\rLine Count:" << (entryLength) << flush;
 			std::cout << endl;
 		}
 		catch (const cl::Error& err) {
 			std::cout << "File input error";
 		}
 
-		size_t entryElements = entryTemp.size(); 
-		size_t entryInputSize = entryTemp.size()*sizeof(floatType);//size in bytes, used for buffer
+		size_t entryElements = entryTemp.size();
+		size_t entryInputSize = entryTemp.size()*sizeof(intType);//size in bytes, used for buffer
 
 		size_t entryGroupSize;
 		size_t entryGroups;
@@ -129,10 +116,10 @@ int main(int argc, char **argv) {
 		}
 
 		//creates the output vectors with a size 1 higher than there are work groups
-		std::vector<floatType> outTempMin(entryGroups + 1);
-		std::vector<floatType> outTempMax(entryGroups + 1);
+		std::vector<intType> outTempMin(entryGroups + 1);
+		std::vector<intType> outTempMax(entryGroups + 1);
 		std::vector<floatType> outTempAvg(entryGroups + 1);
-		size_t entryOutputSize = outTempMin.size()*sizeof(floatType);
+		size_t entryOutputSize = outTempMin.size()*sizeof(intType);
 
 		//creates buffers for input & output vectors
 		cl::Buffer bufferInTemp(context, CL_MEM_READ_ONLY, entryInputSize);
@@ -149,7 +136,7 @@ int main(int argc, char **argv) {
 		kernel_1.setArg(0, bufferInTemp);
 		kernel_1.setArg(1, bufferOutTempMin);
 		kernel_1.setArg(2, cl::Local(entryGroupSize*sizeof(myType)));
-		
+
 		queue.enqueueNDRangeKernel(kernel_1, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));//call all kernels in a sequence
 		queue.enqueueReadBuffer(bufferOutTempMin, CL_TRUE, 0, entryOutputSize, &outTempMin[0]);//Copy the results from device to host
 
@@ -169,8 +156,8 @@ int main(int argc, char **argv) {
 		queue.enqueueNDRangeKernel(kernel_3, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));
 		queue.enqueueReadBuffer(bufferOutTempAvg, CL_TRUE, 0, entryOutputSize, &outTempAvg[0]);
 
-		outTempMin[0] = 999;
-		outTempMax[0] = -999;
+		outTempMin[0] = 99999;
+		outTempMax[0] = -99999;
 		for (int i = 1; i <= entryGroups; i++) {
 			if (outTempMin[0] > outTempMin[i])
 				outTempMin[0] = outTempMin[i];
@@ -184,9 +171,9 @@ int main(int argc, char **argv) {
 		outTempAvg[0] /= entryElements;
 
 		std::cout << std::endl;
-		std::cout << "Min = " << outTempMin[0] << std::endl;
-		std::cout << "Max = " << outTempMax[0] << std::endl;
-		std::cout << "Avg = " << outTempAvg[0] << std::endl;
+		std::cout << "Min = " << (float)outTempMin[0] / 10 << std::endl;
+		std::cout << "Max = " << (float)outTempMax[0] / 10 << std::endl;
+		std::cout << "Avg = " << outTempAvg[0] / 10 << std::endl;
 
 		/*typedef int mytype;
 
@@ -204,10 +191,10 @@ int main(int argc, char **argv) {
 		//if the input vector is not a multiple of the local_size
 		//insert additional neutral elements (0 for addition) so that the total will not be affected
 		if (padding_size) {
-			//create an extra vector with neutral values
-			std::vector<int> A_ext(local_size-padding_size, 0);
-			//append that extra vector to our input
-			A.insert(A.end(), A_ext.begin(), A_ext.end());
+		//create an extra vector with neutral values
+		std::vector<int> A_ext(local_size-padding_size, 0);
+		//append that extra vector to our input
+		A.insert(A.end(), A_ext.begin(), A_ext.end());
 		}
 
 		size_t input_elements = A.size();//number of input elements
@@ -232,7 +219,7 @@ int main(int argc, char **argv) {
 		cl::Kernel kernel_1 = cl::Kernel(program, "reduce_add_1");
 		kernel_1.setArg(0, buffer_A);
 		kernel_1.setArg(1, buffer_B);
-//		kernel_1.setArg(2, cl::Local(local_size*sizeof(mytype)));//local memory size
+		//		kernel_1.setArg(2, cl::Local(local_size*sizeof(mytype)));//local memory size
 
 		//call all kernels in a sequence
 		queue.enqueueNDRangeKernel(kernel_1, cl::NullRange, cl::NDRange(input_elements), cl::NDRange(local_size));

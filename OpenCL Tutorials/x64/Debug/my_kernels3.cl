@@ -1,5 +1,5 @@
 ﻿//minimum value reduce
-__kernel void value_min(__global const float* A, __global float* B, __local float* min) {
+__kernel void value_min(__global const int* A, __global int* B, __local int* min) {
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
 	int N = get_local_size(0);
@@ -27,7 +27,7 @@ __kernel void value_min(__global const float* A, __global float* B, __local floa
 }
 
 //maximum value reduce
-__kernel void value_max(__global const float* A, __global float* B, __local float* max) {
+__kernel void value_max(__global const int* A, __global int* B, __local int* max) {
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
 	int N = get_local_size(0);
@@ -55,7 +55,7 @@ __kernel void value_max(__global const float* A, __global float* B, __local floa
 }
 
 //additive value reduce for average
-__kernel void value_avg(__global const float* A, __global float* B, __local float* avg) {
+__kernel void value_avg(__global const int* A, __global float* B, __local float* avg) {
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
 	int N = get_local_size(0);
