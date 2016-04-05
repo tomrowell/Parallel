@@ -64,48 +64,35 @@ int main(int argc, char **argv) {
 		}
 
 		typedef string myType;
+		typedef int intType;
 		typedef float floatType;
 		string loc, yy, mm, dd, tm, tp;
-		std::vector<myType> entryLoc;
+		/*std::vector<myType> entryLoc;
 		std::vector<myType> entryYear;
 		std::vector<myType> entryMonth;
 		std::vector<myType> entryDay;
-		std::vector<myType> entryTime;
-		std::vector<floatType> entryTemp;
+		std::vector<myType> entryTime;*/
+		std::vector<intType> entryTemp;
 
 		string filePath = "C:\\Users\\Computing\\Documents\\GitHub\\Parallel\\OpenCL Tutorials\\x64\\Debug\\Files\\temp_lincolnshire_short.txt";
 		int entryLength = 0;
 		try {
 			ifstream fileLoc(filePath);
-			ifstream fileLoc2(filePath);
 			string fileLine;
-			int fileCount = 0;
-			std::cout << "Loading file." << endl;
-			while (std::getline(fileLoc2, fileLine)) {
-				fileCount++;
-				if (!(fileCount % 40000)) {
-					std::cout << "\r" << "   " << flush;
-					std::cout << "\r" << flush;
-				}
-				else
-					if (!(fileCount % 10000))
-						std::cout << ".";
-			}
-			std::cout << endl;
-			std::cout << "Processing data." << endl;
 			while (fileLoc >> loc >> yy >> mm >> dd >> tm >> tp) {
-				entryLoc.push_back(loc);
+				/*entryLoc.push_back(loc);
 				entryYear.push_back(yy);
 				entryMonth.push_back(mm);
 				entryDay.push_back(dd);
-				entryTime.push_back(tm);
-				entryTemp.push_back(stof(tp));
+				entryTime.push_back(tm);*/
+				entryTemp.push_back((stof(tp))*10);
 
 				entryLength++;
-				if (entryLength % (fileCount / 100) == 0) {
-					std::cout << "\r" << (entryLength / (fileCount / 100)) << "%" << flush;
+				if (entryLength % 1000 == 0) {
+					std::cout << "\rLine Count:" << (entryLength) << flush;
 				}
 			}
+			std::cout << "\rLine Count:" << (entryLength) << flush;
 			std::cout << endl;
 		}
 		catch (const cl::Error& err) {
@@ -113,7 +100,7 @@ int main(int argc, char **argv) {
 		}
 
 		size_t entryElements = entryTemp.size(); 
-		size_t entryInputSize = entryTemp.size()*sizeof(floatType);//size in bytes, used for buffer
+		size_t entryInputSize = entryTemp.size()*sizeof(intType);//size in bytes, used for buffer
 
 		size_t entryGroupSize;
 		size_t entryGroups;
@@ -129,10 +116,10 @@ int main(int argc, char **argv) {
 		}
 
 		//creates the output vectors with a size 1 higher than there are work groups
-		std::vector<floatType> outTempMin(entryGroups + 1);
-		std::vector<floatType> outTempMax(entryGroups + 1);
+		std::vector<intType> outTempMin(entryGroups + 1);
+		std::vector<intType> outTempMax(entryGroups + 1);
 		std::vector<floatType> outTempAvg(entryGroups + 1);
-		size_t entryOutputSize = outTempMin.size()*sizeof(floatType);
+		size_t entryOutputSize = outTempMin.size()*sizeof(intType);
 
 		//creates buffers for input & output vectors
 		cl::Buffer bufferInTemp(context, CL_MEM_READ_ONLY, entryInputSize);
@@ -169,8 +156,8 @@ int main(int argc, char **argv) {
 		queue.enqueueNDRangeKernel(kernel_3, cl::NullRange, cl::NDRange(entryElements), cl::NDRange(entryGroupSize));
 		queue.enqueueReadBuffer(bufferOutTempAvg, CL_TRUE, 0, entryOutputSize, &outTempAvg[0]);
 
-		outTempMin[0] = 999;
-		outTempMax[0] = -999;
+		outTempMin[0] = 99999;
+		outTempMax[0] = -99999;
 		for (int i = 1; i <= entryGroups; i++) {
 			if (outTempMin[0] > outTempMin[i])
 				outTempMin[0] = outTempMin[i];
@@ -184,9 +171,9 @@ int main(int argc, char **argv) {
 		outTempAvg[0] /= entryElements;
 
 		std::cout << std::endl;
-		std::cout << "Min = " << outTempMin[0] << std::endl;
-		std::cout << "Max = " << outTempMax[0] << std::endl;
-		std::cout << "Avg = " << outTempAvg[0] << std::endl;
+		std::cout << "Min = " << (float)outTempMin[0]/10 << std::endl;
+		std::cout << "Max = " << (float)outTempMax[0]/10 << std::endl;
+		std::cout << "Avg = " << outTempAvg[0]/10 << std::endl;
 
 		/*typedef int mytype;
 
